@@ -29,7 +29,6 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       code: ${{ steps.filter.outputs.code }}
-      docs: ${{ steps.filter.outputs.docs }}
     permissions:
       contents: read
     steps:
@@ -55,12 +54,6 @@ jobs:
           - 'completions/**'
           - 'go.*'
           - 'internal/**/!(install.sh.tmpl)'
-          docs:
-          - 'assets/chezmoi.io/**'
-          - 'pyproject.toml'
-          - 'uv.lock'
-          - '.github/workflows/main.yml'
-          - '.github/workflows/preview-docs.yml'
   codeql:
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -293,7 +286,6 @@ jobs:
       run: |
         go test ./... ${{ env.TEST_FLAGS }}
   test-website:
-    needs: changes
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -320,20 +312,6 @@ jobs:
       env:
         CHEZMOI_GITHUB_TOKEN: ${{ secrets.CHEZMOI_GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: save-pr-number
-      if: github.event_name == 'pull_request' && needs.changes.outputs.docs == 'true'
-      env:
-        PR_NUMBER: ${{ github.event.pull_request.number }}
-      run: echo "${PR_NUMBER}" > pr-number.txt
-    - name: upload-docs-preview
-      if: github.event_name == 'pull_request' && needs.changes.outputs.docs == 'true'
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f   # v7.0.0
-      with:
-        name: docs-site-preview
-        path: |
-          assets/chezmoi.io/site/
-          pr-number.txt
-        retention-days: 3
   test-windows:
     name: test-windows
     needs: changes
