@@ -1,0 +1,98 @@
+name: preview-docs
+on:
+  workflow_run:
+    workflows:
+    - main
+    types:
+    - completed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+jobs:
+  deploy-preview:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      deployments: write
+      pull-requests: write
+    steps:
+    - name: check-for-preview-artifact
+      id: check
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_REPO: ${{ github.repository }}
+        RUN_ID: ${{ github.event.workflow_run.id }}
+      run: |
+        ARTIFACT_EXISTS=$(gh api \
+          "repos/${GH_REPO}/actions/runs/${RUN_ID}/artifacts" \
+          --jq 'any(.artifacts[]; .name == "docs-site-preview")')
+        if [ "${ARTIFACT_EXISTS}" != "true" ]; then
+          echo "No docs-site-preview artifact - not a docs PR. Skipping."
+          echo "skip=true" >> "${GITHUB_OUTPUT}"
+        fi
+    - name: download-docs-site
+      if: steps.check.outputs.skip != 'true'
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c   # v8.0.1
+      with:
+        name: docs-site-preview
+        path: artifact
+        run-id: ${{ github.event.workflow_run.id }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: read-pr-number
+      if: steps.check.outputs.skip != 'true'
+      id: pr
+      run: |
+        PR_NUMBER=$(cat artifact/pr-number.txt)
+        if ! [[ "${PR_NUMBER}" =~ ^[0-9]+$ ]]; then
+          echo "error: invalid PR number in artifact: ${PR_NUMBER}"
+          exit 1
+        fi
+        echo "number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
+    - name: deploy-to-cloudflare-pages
+      if: steps.check.outputs.skip != 'true'
+      id: deploy
+      uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65   # v3.14.1
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        command: pages deploy artifact/assets/chezmoi.io/site --project-name=chezmoi-preview --branch=pr-${{ steps.pr.outputs.number }}
+    - name: create-github-deployment
+      if: steps.check.outputs.skip != 'true'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        PREVIEW_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+      run: |
+        DEPLOYMENT_ID=$(jq -n --arg ref "${HEAD_SHA}" \
+          '{ref: $ref, environment: "preview", production_environment: false, transient_environment: true, auto_merge: false, required_contexts: []}' \
+          | gh api --method POST "repos/${GH_REPO}/deployments" --input - --jq '.id')
+        gh api --method POST \
+          "repos/${GH_REPO}/deployments/${DEPLOYMENT_ID}/statuses" \
+          -f state=success \
+          -f environment=preview \
+          -f environment_url="${PREVIEW_URL}" \
+          -f description="Docs preview"
+    - name: comment-on-pr
+      if: steps.check.outputs.skip != 'true'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ steps.pr.outputs.number }}
+        PREVIEW_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+      run: |
+        MARKER="<!-- chezmoi-docs-preview -->"
+        BODY="${MARKER}
+        > [!NOTE]
+        > 📖 **Docs preview:** ${PREVIEW_URL}"
+        COMMENT_EXISTS=$(gh api \
+          "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+          --paginate --jq "any(.[]; .body | startswith(\"${MARKER}\"))")
+        if [ "${COMMENT_EXISTS}" != "true" ]; then
+          gh api --method POST \
+            "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+            -f body="${BODY}"
+        fi
