@@ -42,15 +42,9 @@ jobs:
       env:
         CHEZMOI_GITHUB_TOKEN: ${{ secrets.CHEZMOI_GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: save-pr-number
-      env:
-        PR_NUMBER: ${{ github.event.pull_request.number }}
-      run: echo "${PR_NUMBER}" > pr-number.txt
     - name: upload-docs-preview
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f   # v7.0.0
       with:
         name: docs-site-preview
-        path: |
-          assets/chezmoi.io/site/
-          pr-number.txt
-        retention-days: 3
+        path: assets/chezmoi.io/site/
+        retention-days: 1

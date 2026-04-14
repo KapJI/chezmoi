@@ -25,12 +25,16 @@ jobs:
         path: artifact
         run-id: ${{ github.event.workflow_run.id }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
-    - name: read-pr-number
+    - name: find-pr-number
       id: pr
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       run: |
-        PR_NUMBER=$(cat artifact/pr-number.txt)
-        if ! [[ "${PR_NUMBER}" =~ ^[0-9]+$ ]]; then
-          echo "error: invalid PR number in artifact: ${PR_NUMBER}"
+        PR_NUMBER=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/pulls" --jq '.[0].number')
+        if [ -z "${PR_NUMBER}" ]; then
+          echo "error: could not determine PR number for commit ${HEAD_SHA}"
           exit 1
         fi
         echo "number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
