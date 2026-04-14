@@ -64,7 +64,7 @@ jobs:
         )
         EXISTING_COMMENT_ID=$(gh api \
           "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
-          --paginate --jq ".[] | select(.body | startswith(\"${MARKER}\")) | .id" \
+          --jq ".[] | select(.body | startswith(\"${MARKER}\")) | .id" \
           | head -1)
         if [ -n "${EXISTING_COMMENT_ID}" ]; then
           gh api --method PATCH \
