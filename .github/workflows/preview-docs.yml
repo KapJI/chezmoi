@@ -44,7 +44,7 @@ jobs:
       with:
         apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        command: pages deploy artifact/assets/chezmoi.io/site --project-name=chezmoi-preview-test --branch=pr-${{ steps.pr.outputs.number }}
+        command: pages deploy artifact --project-name=chezmoi-preview-test --branch=pr-${{ steps.pr.outputs.number }}
     - name: comment-on-pr
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
