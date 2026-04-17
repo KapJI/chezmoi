@@ -80,7 +80,7 @@ jobs:
       with:
         apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        command: pages deploy artifact/site --project-name=chezmoi-preview --branch=pr-${{ steps.pr.outputs.number }}
+        command: pages deploy artifact/site --project-name=chezmoi-preview-test --branch=pr-${{ steps.pr.outputs.number }}
     - name: short-sha
       if: always()
       id: sha
