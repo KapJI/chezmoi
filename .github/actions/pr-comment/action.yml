@@ -1,0 +1,38 @@
+name: pr-comment
+description: Create or update a PR comment identified by a marker in its body
+inputs:
+  pr-number:
+    description: PR number
+    required: true
+  marker:
+    description: Marker used to find existing comment. Prepended to body automatically.
+    required: true
+  body:
+    description: Comment body
+    required: true
+runs:
+  using: composite
+  steps:
+  - shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ inputs.pr-number }}
+      MARKER: ${{ inputs.marker }}
+      BODY: ${{ inputs.body }}
+    run: |
+      FULL_BODY="${MARKER}
+      ${BODY}"
+      EXISTING_COMMENT_ID=$(gh api \
+        "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+        --paginate --jq ".[] | select(.body | startswith(\"${MARKER}\")) | .id" \
+        | head -1)
+      if [ -n "${EXISTING_COMMENT_ID}" ]; then
+        gh api --method PATCH \
+          "repos/${GH_REPO}/issues/comments/${EXISTING_COMMENT_ID}" \
+          -f body="${FULL_BODY}"
+      else
+        gh api --method POST \
+          "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+          -f body="${FULL_BODY}"
+      fi
