@@ -52,4 +52,4 @@ jobs:
         path: |
           assets/chezmoi.io/site/
           assets/chezmoi.io/digest.txt
-        retention-days: 1
+        retention-days: 2
